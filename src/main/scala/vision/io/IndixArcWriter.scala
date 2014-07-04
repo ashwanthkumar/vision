@@ -2,8 +2,10 @@ package vision.io
 
 import java.io.{ByteArrayInputStream, File}
 import java.util
+import java.util.Scanner
 
 import org.apache.commons.io.FileUtils
+import scala.io.Source
 import org.apache.commons.lang3.StringUtils
 import org.archive.format.arc.ARCConstants
 import org.archive.io.arc.{ARCWriter, ARCWriterPool, WriterPoolSettingsData}
@@ -38,7 +40,7 @@ class IndixArcWriter(arcFileTemplate: String, shouldCompress: Boolean, outputDir
     val writer = writerPool.borrowFile().asInstanceOf[ARCWriter]
     if(htmlRecord.isValidRecord) {
       log.info(s"Writing record for ${htmlRecord.url}")
-      writer.write(htmlRecord.url, htmlRecord.contentType, htmlRecord.supervisorIpAddress, htmlRecord.fetchedTimestamp, htmlRecord.contentLength, htmlRecord.contentStream)
+      writer.write(htmlRecord.url, htmlRecord.contentType, htmlRecord.supervisorIpAddress, htmlRecord.fetchedTimestamp, htmlRecord.contentLength, htmlRecord.contentStream,false)
     } else {
       log.warn(s"Skipping ${htmlRecord.url} as invalid record")
     }
@@ -58,21 +60,33 @@ class IndixArcWriter(arcFileTemplate: String, shouldCompress: Boolean, outputDir
 object ArcWriterJob extends App {
   def getContent(file: String) = FileUtils.readFileToString(new File(file))
 
-  val baseHtmlFileLocation = "/home/ashwanth/htmlFiles/"
-  val writer = new IndixArcWriter("arcFile_1_${serialno}", false, new File("/home/ashwanth/arcFiles/"))
-
-  (1 to 100000*6).foreach{index =>
-    writer.write(
-      HTMLRecord(
-        url = s"http://www.test-site.com/page-$index",
-        content = getContent(baseHtmlFileLocation + "/helloworld.html"),
-        statusCode = 200, fetchedTimestamp = System.currentTimeMillis(), supervisorIpAddress = "127.0.0.1",
-        contentType = "text/html"
-      )
-    )
+  def getListOfFiles(directoryName: String): List[String] = {
+    return (new File(directoryName)).listFiles.map(_.getName).toList
   }
-  //val converter: ARCToWARCConverter = new ARCToWARCConverter
-  //converter.transform(new File("/home/ashwanth/arcFiles/arcFile_1_00001.arc"), new File("home/ashwanth/arcFiles/htmlPages.warc.gz"))
+
+  val baseHtmlFileLocation = "/home/kumaran/htmlFiles/crawler4j-scala/"
+  val writer = new IndixArcWriter("arcFile_1_${serialno}", true, new File("/home/kumaran/arcFiles/"))
+
+  val filesInDirectory = getListOfFiles(baseHtmlFileLocation)
+
+  filesInDirectory.foreach{ index =>
+    writer.write(
+          HTMLRecord(
+            url = Source.fromFile(baseHtmlFileLocation + index).getLines().next(),
+            //url = "www.rakuten_1.html",
+            content = scala.io.Source.fromFile(baseHtmlFileLocation + index).mkString,
+            statusCode = 200, fetchedTimestamp = System.currentTimeMillis(), supervisorIpAddress = "127.0.0.1",
+            contentType = "text/html"
+          )
+        )
+    }
+
+  val converter: ARCToWARCConverter = new ARCToWARCConverter
+  val arcFilesInDirectory = getListOfFiles("/home/kumaran/arcFiles/")
+
+  arcFilesInDirectory.foreach{ index =>
+    converter.transform(new File("/home/kumaran/arcFiles/" + index), new File("/home/kumaran/arcFiles/htmlPages.warc.gz"))
+  }
 
   writer.close()
 }

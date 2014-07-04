@@ -18,7 +18,7 @@ class ARCToWARCConverter() {
   val generator = new UUIDGenerator()
 
   def transform(arcFile : File, warcFile : File) = {
-    val arcReader = ARCReaderFactory.get(arcFile, false, 0)
+    val arcReader = ARCReaderFactory.get(arcFile, true, 0)
     arcReader.setDigest(false)
     val bos = new BufferedOutputStream(new FileOutputStream(warcFile))
 
@@ -29,7 +29,7 @@ class ARCToWARCConverter() {
 
     val ar : ANVLRecord = new ANVLRecord()
     ar.addLabelValue("Filedesc", baos.toString())
-    val warcWriter = new WARCWriter(new AtomicInteger, bos, warcFile, new WARCWriterPoolSettingsData("", "", -1, arcReader.isCompressed, null, null, generator))
+    val warcWriter = new WARCWriter(new AtomicInteger, bos, warcFile, new WARCWriterPoolSettingsData("", "", -1, true, null, null, generator))
 
     while(iter.hasNext) {
       write(warcWriter, iter.next.asInstanceOf[ARCRecord])
@@ -49,14 +49,11 @@ class ARCToWARCConverter() {
     recordInfo.setMimetype(WARCConstants.HTTP_RESPONSE_MIMETYPE)
     recordInfo.setRecordId(generator.getRecordID)
     recordInfo.setExtraHeaders(anvlRecord)
-    recordInfo
-  }
-
-  def setDate(arcRecord : ARCRecord, recordInfo : WARCRecordInfo) = {
     //convert ARC date to WARC-Date format
     val arcDateString: String = arcRecord.getHeader.getDate()
     val warcDateString: String = DateTimeFormat.forPattern("yyyyMMddHHmmss").withZone(DateTimeZone.UTC).parseDateTime(arcDateString).toString(ISODateTimeFormat.dateTimeNoMillis)
     recordInfo.setCreate14DigitDate(warcDateString)
+    recordInfo
   }
 
   def createANVLRecord(arcRecord : ARCRecord) : ANVLRecord = {
@@ -70,7 +67,6 @@ class ARCToWARCConverter() {
   def write(writer : WARCWriter, arcRecord : ARCRecord) = {
     val anvlRecord: ANVLRecord = createANVLRecord(arcRecord)
     val recordInfo : WARCRecordInfo = createWarcRecordInfo(arcRecord, anvlRecord)
-    setDate(arcRecord, recordInfo)
     writer.writeRecord(recordInfo)
   }
 
